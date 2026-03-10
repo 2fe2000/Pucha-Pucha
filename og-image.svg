@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e3a5f"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- 격자 패턴 -->
+  <g opacity="0.06" stroke="#fff" stroke-width="1">
+    <line x1="0" y1="105" x2="1200" y2="105"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="525" x2="1200" y2="525"/>
+    <line x1="200" y1="0" x2="200" y2="630"/>
+    <line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+
+  <!-- 액센트 바 -->
+  <rect x="80" y="200" width="6" height="120" rx="3" fill="url(#accent)"/>
+
+  <!-- 로고 배지 -->
+  <rect x="80" y="100" width="56" height="56" rx="14" fill="#2563eb"/>
+  <text x="108" y="138" font-size="28" text-anchor="middle" font-family="Arial">🗺️</text>
+
+  <!-- 브랜드 제목 -->
+  <text x="152" y="126" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#93c5fd" letter-spacing="2">PUCHA PUCHA</text>
+  <text x="152" y="148" font-family="Arial, sans-serif" font-size="13" fill="#64748b">프차프차</text>
+
+  <!-- 메인 타이틀 -->
+  <text x="94" y="260" font-family="Arial, sans-serif" font-size="58" font-weight="700" fill="#fff" letter-spacing="-1">전국 프랜차이즈</text>
+  <text x="94" y="330" font-family="Arial, sans-serif" font-size="58" font-weight="700" fill="#fff" letter-spacing="-1">가맹점 지도</text>
+
+  <!-- 서브 설명 -->
+  <text x="94" y="390" font-family="Arial, sans-serif" font-size="22" fill="#94a3b8">교촌 · BBQ · BHC · 스타벅스 · 파리바게뜨 등 20개 브랜드</text>
+
+  <!-- 구분선 -->
+  <rect x="94" y="420" width="500" height="1" fill="#334155"/>
+
+  <!-- 통계 -->
+  <text x="94" y="460" font-family="Arial, sans-serif" font-size="18" fill="#64748b">브랜드 &amp; 지역별 검색  ·  실시간 클러스터 지도</text>
+
+  <!-- 브랜드 이모지 원형 -->
+  <circle cx="820" cy="315" r="200" fill="#1e3a5f" opacity="0.5"/>
+  <circle cx="820" cy="315" r="160" fill="#1e293b" opacity="0.7"/>
+
+  <text x="820" y="180" font-size="42" text-anchor="middle" font-family="Arial">🍗</text>
+  <text x="960" y="240" font-size="36" text-anchor="middle" font-family="Arial">🥐</text>
+  <text x="990" y="340" font-size="36" text-anchor="middle" font-family="Arial">☕</text>
+  <text x="940" y="440" font-size="36" text-anchor="middle" font-family="Arial">🍔</text>
+  <text x="820" y="470" font-size="36" text-anchor="middle" font-family="Arial">🍕</text>
+  <text x="690" y="440" font-size="36" text-anchor="middle" font-family="Arial">🍦</text>
+  <text x="640" y="340" font-size="36" text-anchor="middle" font-family="Arial">🍩</text>
+  <text x="690" y="240" font-size="36" text-anchor="middle" font-family="Arial">💄</text>
+  <text x="820" y="340" font-size="52" text-anchor="middle" font-family="Arial">🗺️</text>
+
+  <!-- URL 배지 -->
+  <rect x="80" y="550" width="320" height="40" rx="8" fill="#1e293b"/>
+  <text x="240" y="576" font-family="Arial, sans-serif" font-size="16" fill="#94a3b8" text-anchor="middle">pucha-pucha.vercel.app</text>
+</svg>
