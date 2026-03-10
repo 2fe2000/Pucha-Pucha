@@ -5,264 +5,580 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>프차프차 — 전국 프랜차이즈 가맹점 지도</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #f8f9fa; --sidebar-w: 360px; --header-h: 56px;
-      --primary: #2563eb; --border: #e5e7eb; --text: #111827; --muted: #6b7280;
+      --sidebar-w: 340px;
+      --header-h: 58px;
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --border: #e5e7eb;
+      --text: #111827;
+      --muted: #6b7280;
+      --bg: #f9fafb;
+      --card: #fff;
+      --radius: 10px;
     }
     body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── Header ── */
     #header {
       position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
       background: #fff; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; padding: 0 20px; gap: 12px;
-      z-index: 1000; box-shadow: 0 1px 6px rgba(0,0,0,.07);
+      display: flex; align-items: center; padding: 0 18px; gap: 10px;
+      z-index: 1000; box-shadow: 0 1px 8px rgba(0,0,0,.06);
     }
-    #header .logo { font-size: 20px; font-weight: 700; color: var(--primary); letter-spacing: -0.5px; }
-    #header .sub  { font-size: 13px; color: var(--muted); }
-    #header .stats { margin-left: auto; font-size: 13px; color: var(--muted); }
-    #header .stats b { color: var(--primary); }
+    .logo-wrap { display: flex; align-items: center; gap: 8px; }
+    .logo-icon { width: 30px; height: 30px; background: var(--primary); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 15px; }
+    .logo-text { font-size: 19px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
+    .logo-text span { color: var(--primary); }
+    .header-sub { font-size: 12px; color: var(--muted); padding-left: 10px; border-left: 1px solid var(--border); }
+    .header-stats { margin-left: auto; display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--muted); }
+    .header-stats b { color: var(--primary); font-weight: 700; font-size: 14px; }
+
+    /* ── Layout ── */
     #layout { display: flex; height: calc(100vh - var(--header-h)); margin-top: var(--header-h); }
+
+    /* ── Sidebar ── */
     #sidebar {
       width: var(--sidebar-w); min-width: var(--sidebar-w);
-      background: #fff; border-right: 1px solid var(--border);
+      background: var(--card); border-right: 1px solid var(--border);
       display: flex; flex-direction: column; overflow: hidden; z-index: 100;
     }
-    #brand-panel { padding: 14px 14px 0; border-bottom: 1px solid var(--border); }
-    #brand-panel h3 { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .5px; margin-bottom: 10px; text-transform: uppercase; }
-    #brand-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-height: 220px; overflow-y: auto; padding-bottom: 12px; }
+
+    /* ── Tab Bar ── */
+    #tab-bar {
+      display: flex; border-bottom: 1px solid var(--border);
+      padding: 0 4px; gap: 2px; background: #fff;
+    }
+    .tab-btn {
+      flex: 1; padding: 11px 8px; font-size: 13px; font-weight: 600;
+      color: var(--muted); border: none; background: none; cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color .15s, border-color .15s; font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+    }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    /* ── Tab Panels ── */
+    .tab-panel { display: none; padding: 12px 12px 0; }
+    .tab-panel.active { display: block; }
+
+    /* ── Brand Grid ── */
+    #brand-panel { padding: 12px 12px 0; border-bottom: 1px solid var(--border); }
+    #brand-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;
+      max-height: 195px; overflow-y: auto; padding-bottom: 10px;
+    }
     .brand-btn {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 3px; padding: 7px 4px; border: 1.5px solid var(--border); border-radius: 8px;
-      background: #fff; cursor: pointer; transition: all .15s; font-size: 10px; color: var(--muted); font-family: inherit;
+      gap: 2px; padding: 7px 3px; border: 1.5px solid var(--border); border-radius: 8px;
+      background: #fff; cursor: pointer; transition: all .15s;
+      font-size: 9.5px; color: var(--muted); font-family: inherit; line-height: 1.3;
     }
-    .brand-btn .icon { font-size: 18px; }
-    .brand-btn:hover { border-color: #94a3b8; color: var(--text); }
-    .brand-btn.active { color: #fff; border-color: transparent; font-weight: 600; }
-    .brand-btn .cnt { font-size: 9px; opacity: .8; background: rgba(255,255,255,.25); padding: 1px 4px; border-radius: 4px; min-width: 20px; text-align: center; }
-    #search-panel { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .brand-btn .b-icon { font-size: 17px; }
+    .brand-btn .b-name { font-size: 9.5px; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; width: 100%; text-overflow: ellipsis; padding: 0 2px; }
+    .brand-btn .b-cnt { font-size: 8.5px; background: rgba(0,0,0,.07); padding: 1px 4px; border-radius: 10px; }
+    .brand-btn:hover { border-color: #94a3b8; color: var(--text); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+    .brand-btn.active { color: #fff; border-color: transparent; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    .brand-btn.active .b-cnt { background: rgba(255,255,255,.25); color: #fff; }
+    .all-btn { grid-column: span 2; flex-direction: row; gap: 6px; padding: 8px 12px; justify-content: flex-start; }
+
+    /* ── Region Grid ── */
+    #region-panel { padding: 12px 12px 0; border-bottom: 1px solid var(--border); }
+    #region-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding-bottom: 10px; }
+    .region-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; padding: 8px 4px; border: 1.5px solid var(--border); border-radius: 8px;
+      background: #fff; cursor: pointer; transition: all .15s;
+      font-size: 12px; font-weight: 600; color: var(--muted); font-family: inherit;
+    }
+    .region-btn .r-cnt { font-size: 9px; color: var(--muted); font-weight: 400; }
+    .region-btn:hover { border-color: #94a3b8; color: var(--text); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+    .region-btn.active { background: #0f172a; border-color: #0f172a; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+    .region-btn.active .r-cnt { color: rgba(255,255,255,.7); }
+    .all-region-btn { grid-column: span 2; flex-direction: row; gap: 6px; padding: 8px 12px; justify-content: flex-start; font-size: 13px; }
+
+    /* ── Active Filter Chips ── */
+    #filter-chips { display: none; padding: 8px 12px; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+    #filter-chips.visible { display: flex; }
+    .chip {
+      display: flex; align-items: center; gap: 4px; padding: 3px 8px 3px 10px;
+      border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .chip:hover { opacity: .8; }
+    .chip-x { font-size: 12px; opacity: .7; }
+
+    /* ── Search ── */
+    #search-panel { padding: 10px 12px; border-bottom: 1px solid var(--border); }
     #search-wrap { position: relative; }
-    #search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+    #search-wrap .s-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
     #search-input {
-      width: 100%; padding: 9px 12px 9px 34px; border: 1.5px solid var(--border); border-radius: 8px;
-      font-size: 13px; font-family: inherit; outline: none; transition: border-color .15s;
+      width: 100%; padding: 8px 10px 8px 32px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 13px; font-family: inherit; outline: none; background: var(--bg);
+      transition: border-color .15s, background .15s;
     }
-    #search-input:focus { border-color: var(--primary); }
-    #list-header { padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
-    #list-header span { font-size: 13px; color: var(--muted); }
-    #list-header b { color: var(--text); }
+    #search-input:focus { border-color: var(--primary); background: #fff; }
+    #search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      border: none; background: none; cursor: pointer; color: var(--muted); font-size: 14px; display: none; padding: 2px; }
+    #search-clear.visible { display: block; }
+
+    /* ── List Header ── */
+    #list-header {
+      padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border); background: var(--bg);
+    }
+    #list-header .lh-count { font-size: 12px; color: var(--muted); }
+    #list-header .lh-count b { color: var(--text); font-weight: 700; }
+    #list-header .lh-sort { font-size: 11px; color: var(--muted); }
+
+    /* ── Store List ── */
     #store-list { flex: 1; overflow-y: auto; }
-    .store-item { padding: 12px 14px; border-bottom: 1px solid #f3f4f6; cursor: pointer; transition: background .12s; display: flex; gap: 10px; align-items: flex-start; }
+    .store-item {
+      padding: 11px 12px; border-bottom: 1px solid #f3f4f6;
+      cursor: pointer; transition: background .1s; display: flex; gap: 10px; align-items: flex-start;
+    }
     .store-item:hover { background: #f8faff; }
-    .store-item.active { background: #eff6ff; }
-    .store-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+    .store-item.active { background: var(--primary-light); }
+    .store-badge {
+      width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+    }
     .store-info { flex: 1; min-width: 0; }
-    .store-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
-    .store-addr { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .store-phone { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-    .empty-msg { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; color: var(--muted); font-size: 14px; gap: 8px; }
-    .empty-msg .big { font-size: 36px; }
-    #map { flex: 1; }
-    .store-popup { min-width: 200px; font-family: 'Noto Sans KR', sans-serif; }
-    .store-popup .p-brand { font-size: 11px; font-weight: 700; margin-bottom: 5px; }
-    .store-popup .p-name  { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: #111; }
-    .store-popup .p-addr  { font-size: 12px; color: #555; line-height: 1.5; margin-bottom: 4px; }
-    .store-popup .p-phone { font-size: 12px; color: #888; }
-    .leaflet-popup-content-wrapper { border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
-    #loading { position: fixed; inset: 0; background: rgba(255,255,255,.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
+    .store-name { font-size: 13px; font-weight: 700; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .store-brand-tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px; margin-bottom: 3px; }
+    .store-addr { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .store-phone { font-size: 10.5px; color: #94a3b8; margin-top: 2px; }
+
+    .empty-msg { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; color: var(--muted); font-size: 13px; gap: 10px; }
+    .empty-msg .big { font-size: 40px; }
+
+    /* ── Map ── */
+    #map { flex: 1; position: relative; }
+    #my-location-btn {
+      position: absolute; bottom: 24px; right: 14px; z-index: 500;
+      width: 40px; height: 40px; border-radius: 50%; background: #fff;
+      border: none; box-shadow: 0 2px 10px rgba(0,0,0,.18); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+      transition: box-shadow .15s;
+    }
+    #my-location-btn:hover { box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+
+    /* ── Popup ── */
+    .store-popup { min-width: 200px; padding: 2px; font-family: 'Noto Sans KR', sans-serif; }
+    .p-brand-row { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
+    .p-brand-badge { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+    .p-brand-name { font-size: 10px; font-weight: 700; letter-spacing: .3px; }
+    .p-name { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 5px; }
+    .p-addr { font-size: 11.5px; color: #555; line-height: 1.55; margin-bottom: 4px; }
+    .p-phone { font-size: 11px; color: #888; }
+    .leaflet-popup-content-wrapper { border-radius: 12px !important; box-shadow: 0 6px 20px rgba(0,0,0,.15) !important; padding: 14px 16px !important; }
+    .leaflet-popup-content { margin: 0 !important; }
+
+    /* ── Cluster ── */
+    .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background-clip: padding-box; border-radius: 20px; }
+    .marker-cluster-small { background: rgba(37,99,235,.18); }
+    .marker-cluster-small div { background: rgba(37,99,235,.7); color:#fff; font-weight:700; }
+    .marker-cluster-medium { background: rgba(217,119,6,.18); }
+    .marker-cluster-medium div { background: rgba(217,119,6,.8); color:#fff; font-weight:700; }
+    .marker-cluster-large { background: rgba(220,38,38,.18); }
+    .marker-cluster-large div { background: rgba(220,38,38,.8); color:#fff; font-weight:700; }
+
+    /* ── Loading ── */
+    #loading { position: fixed; inset: 0; background: rgba(255,255,255,.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
     #loading.hidden { display: none; }
-    .spinner { width: 44px; height: 44px; border: 4px solid #e5e7eb; border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
+    .spinner { width: 42px; height: 42px; border: 3px solid #e5e7eb; border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading p { font-size: 15px; color: var(--muted); }
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+    #loading p { font-size: 14px; color: var(--muted); }
+    #loading b { color: var(--primary); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+
+    /* ── Mobile ── */
     @media (max-width: 640px) {
       :root { --sidebar-w: 100vw; }
-      #layout { flex-direction: column; }
-      #sidebar { width: 100%; height: 50vh; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); }
-      #map { height: 50vh; }
+      #layout { flex-direction: column-reverse; }
+      #sidebar { width: 100%; height: 45vh; min-width: unset; border-right: none; border-top: 1px solid var(--border); }
+      #map { height: 55vh; }
+      .header-sub { display: none; }
     }
   </style>
 </head>
 <body>
 
-<div id="loading"><div class="spinner"></div><p>데이터 불러오는 중...</p></div>
+<div id="loading"><div class="spinner"></div><p>가맹점 데이터 불러오는 중... <b id="load-progress"></b></p></div>
 
 <header id="header">
-  <div class="logo">프차프차</div>
-  <div class="sub">전국 프랜차이즈 가맹점 지도</div>
-  <div class="stats">총 <b id="total-count">0</b>개 가맹점</div>
+  <div class="logo-wrap">
+    <div class="logo-icon">🗺️</div>
+    <div class="logo-text">프차<span>프차</span></div>
+  </div>
+  <div class="header-sub">전국 프랜차이즈 가맹점 지도</div>
+  <div class="header-stats">총 <b id="total-count">0</b>개 가맹점</div>
 </header>
 
 <div id="layout">
   <aside id="sidebar">
+
+    <!-- 탭 바 -->
+    <div id="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('brand')">🏪 브랜드</button>
+      <button class="tab-btn" onclick="switchTab('region')">📍 지역</button>
+    </div>
+
+    <!-- 브랜드 패널 -->
     <div id="brand-panel">
-      <h3>브랜드 선택</h3>
       <div id="brand-grid"></div>
     </div>
+
+    <!-- 지역 패널 -->
+    <div id="region-panel" style="display:none">
+      <div id="region-grid"></div>
+    </div>
+
+    <!-- 활성 필터 칩 -->
+    <div id="filter-chips"></div>
+
+    <!-- 검색 -->
     <div id="search-panel">
       <div id="search-wrap">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <svg class="s-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input id="search-input" type="text" placeholder="가맹점명 또는 주소 검색...">
+        <button id="search-clear" onclick="clearSearch()">✕</button>
       </div>
     </div>
+
+    <!-- 리스트 헤더 -->
     <div id="list-header">
-      <span><b id="list-count">0</b>개 가맹점</span>
-      <span id="active-brand-label" style="font-size:12px; color:var(--muted);">전체</span>
+      <div class="lh-count"><b id="list-count">0</b>개 가맹점</div>
+      <div class="lh-sort" id="active-filter-label">전체</div>
     </div>
+
+    <!-- 가맹점 목록 -->
     <div id="store-list"></div>
   </aside>
-  <div id="map"></div>
+
+  <div id="map">
+    <button id="my-location-btn" title="내 위치" onclick="goToMyLocation()">📍</button>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 const BRANDS = [
-  { id:"yoogane",    name:"유가네닭갈비",color:"#e8500a", icon:"🥘" },
-  { id:"hansot",     name:"한솥도시락",  color:"#e85b00", icon:"🍱" },
-  { id:"kyochon",    name:"교촌치킨",    color:"#c8102e", icon:"🍗" },
-  { id:"bbq",        name:"BBQ",         color:"#ffb300", icon:"🍗" },
-  { id:"bhc",        name:"BHC치킨",     color:"#e8001b", icon:"🍗" },
-  { id:"nene",       name:"네네치킨",    color:"#ff6600", icon:"🍗" },
-  { id:"goobne",     name:"굽네치킨",    color:"#d4380d", icon:"🍗" },
-  { id:"paris",      name:"파리바게뜨",  color:"#003087", icon:"🥐" },
-  { id:"tlj",        name:"뚜레쥬르",    color:"#005bac", icon:"🥐" },
-  { id:"starbucks",  name:"스타벅스",    color:"#00704a", icon:"☕" },
-  { id:"ediya",      name:"이디야",      color:"#0071ce", icon:"☕" },
-  { id:"twosome",    name:"투썸플레이스",color:"#7b2d8b", icon:"☕" },
-  { id:"mcdonalds",  name:"맥도날드",    color:"#ffbc0d", icon:"🍔" },
-  { id:"lotteria",   name:"롯데리아",    color:"#e60012", icon:"🍔" },
-  { id:"burgerking", name:"버거킹",      color:"#d62300", icon:"🍔" },
-  { id:"kfc",        name:"KFC",         color:"#f40027", icon:"🍔" },
-  { id:"pizzahut",   name:"피자헛",      color:"#ee3124", icon:"🍕" },
-  { id:"dominos",    name:"도미노피자",  color:"#006491", icon:"🍕" },
-  { id:"baskin",     name:"배스킨라빈스",color:"#e8256e", icon:"🍦" },
-  { id:"dunkin",     name:"던킨",        color:"#ff6e00", icon:"🍩" },
-  { id:"oliveyoung", name:"올리브영",    color:"#00a650", icon:"💄" },
-  { id:"bbonjok",    name:"뽕족",        color:"#ff4500", icon:"🍜" },
+  { id:"yoogane",    name:"유가네닭갈비", color:"#e8500a", icon:"🥘" },
+  { id:"hansot",     name:"한솥도시락",   color:"#e85b00", icon:"🍱" },
+  { id:"kyochon",    name:"교촌치킨",     color:"#c8102e", icon:"🍗" },
+  { id:"bbq",        name:"BBQ",          color:"#ffb300", icon:"🍗" },
+  { id:"bhc",        name:"BHC치킨",      color:"#e8001b", icon:"🍗" },
+  { id:"nene",       name:"네네치킨",     color:"#ff6600", icon:"🍗" },
+  { id:"goobne",     name:"굽네치킨",     color:"#d4380d", icon:"🍗" },
+  { id:"paris",      name:"파리바게뜨",   color:"#003087", icon:"🥐" },
+  { id:"tlj",        name:"뚜레쥬르",     color:"#005bac", icon:"🥐" },
+  { id:"starbucks",  name:"스타벅스",     color:"#00704a", icon:"☕" },
+  { id:"ediya",      name:"이디야",       color:"#0071ce", icon:"☕" },
+  { id:"twosome",    name:"투썸플레이스", color:"#7b2d8b", icon:"☕" },
+  { id:"mcdonalds",  name:"맥도날드",     color:"#ffbc0d", icon:"🍔" },
+  { id:"lotteria",   name:"롯데리아",     color:"#e60012", icon:"🍔" },
+  { id:"burgerking", name:"버거킹",       color:"#d62300", icon:"🍔" },
+  { id:"kfc",        name:"KFC",          color:"#f40027", icon:"🍔" },
+  { id:"pizzahut",   name:"피자헛",       color:"#ee3124", icon:"🍕" },
+  { id:"dominos",    name:"도미노피자",   color:"#006491", icon:"🍕" },
+  { id:"baskin",     name:"배스킨라빈스", color:"#e8256e", icon:"🍦" },
+  { id:"dunkin",     name:"던킨",         color:"#ff6e00", icon:"🍩" },
+  { id:"oliveyoung", name:"올리브영",     color:"#00a650", icon:"💄" },
+  { id:"bbonjok",    name:"뽕족",         color:"#ff4500", icon:"🍜" },
 ];
 
-let allStores = [], filtered = [], layers = {}, activeId = null, activeItem = null;
+const REGIONS = [
+  { id:'서울', label:'서울', keywords:['서울특별시','서울'] },
+  { id:'경기', label:'경기', keywords:['경기도','경기'] },
+  { id:'인천', label:'인천', keywords:['인천광역시','인천'] },
+  { id:'강원', label:'강원', keywords:['강원특별자치도','강원도','강원'] },
+  { id:'충북', label:'충북', keywords:['충청북도','충북'] },
+  { id:'충남', label:'충남', keywords:['충청남도','충남'] },
+  { id:'대전', label:'대전', keywords:['대전광역시','대전'] },
+  { id:'세종', label:'세종', keywords:['세종특별자치시','세종시','세종'] },
+  { id:'전북', label:'전북', keywords:['전북특별자치도','전라북도','전북'] },
+  { id:'전남', label:'전남', keywords:['전라남도','전남'] },
+  { id:'광주', label:'광주', keywords:['광주광역시','광주'] },
+  { id:'경북', label:'경북', keywords:['경상북도','경북'] },
+  { id:'경남', label:'경남', keywords:['경상남도','경남'] },
+  { id:'대구', label:'대구', keywords:['대구광역시','대구'] },
+  { id:'부산', label:'부산', keywords:['부산광역시','부산'] },
+  { id:'울산', label:'울산', keywords:['울산광역시','울산'] },
+  { id:'제주', label:'제주', keywords:['제주특별자치도','제주도','제주'] },
+];
 
-// ── Leaflet 지도 ──────────────────────────────
-const map = L.map('map').setView([36.5, 127.8], 7);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors', maxZoom: 19
-}).addTo(map);
-
-function makeIcon(color) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="27" viewBox="0 0 20 27">
-    <path d="M10 0C4.477 0 0 4.477 0 10c0 6.627 10 17 10 17s10-10.373 10-17C20 4.477 15.523 0 10 0z" fill="${color}"/>
-    <circle cx="10" cy="10" r="4" fill="#fff" opacity=".9"/>
-  </svg>`;
-  return L.divIcon({ html: svg, iconSize: [20,27], iconAnchor: [10,27], popupAnchor: [0,-27], className: '' });
+// 지역 매핑 함수
+function getRegionId(address) {
+  if (!address) return null;
+  for (const r of REGIONS) {
+    for (const kw of r.keywords) {
+      if (address.startsWith(kw)) return r.id;
+    }
+  }
+  return null;
 }
 
-function buildMarkers(stores) {
-  Object.values(layers).forEach(g => map.removeLayer(g));
-  layers = {};
-  BRANDS.forEach(b => {
-    const group = L.layerGroup();
-    const icon = makeIcon(b.color);
-    stores.filter(s => s.brandId === b.id).forEach(s => {
-      const m = L.marker([s.lat, s.lng], { icon })
-        .bindPopup(`<div class="store-popup">
-          <div class="p-brand" style="color:${b.color}">${b.icon} ${b.name}</div>
-          <div class="p-name">${s.name}</div>
-          <div class="p-addr">${s.address || ''}</div>
-          ${s.phone ? `<div class="p-phone">📞 ${s.phone}</div>` : ''}
-        </div>`);
-      m._sid = s._id; m._bid = b.id;
-      group.addLayer(m);
-    });
-    layers[b.id] = group;
-    group.addTo(map);
+let allStores = [], filtered = [];
+let clusterGroup = null;
+let activeId = null;
+let activeRegion = null;
+let activeItem = null;
+let currentTab = 'brand';
+
+// ── 지도 초기화 ──────────────────────────────────
+const map = L.map('map', { zoomControl: false }).setView([36.5, 127.8], 7);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+function makeIcon(color, emoji) {
+  return L.divIcon({
+    html: `<div style="
+      width:28px;height:28px;border-radius:50% 50% 50% 0;
+      background:${color};transform:rotate(-45deg);
+      box-shadow:0 2px 6px rgba(0,0,0,.3);
+      display:flex;align-items:center;justify-content:center;
+    "><span style="transform:rotate(45deg);font-size:12px;line-height:28px;display:block;text-align:center">${emoji}</span></div>`,
+    iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -30], className: ''
   });
 }
 
-function renderBrands(counts) {
+// ── 마커 클러스터 빌드 ──────────────────────────
+function buildMarkers(stores) {
+  if (clusterGroup) map.removeLayer(clusterGroup);
+  clusterGroup = L.markerClusterGroup({
+    maxClusterRadius: 50,
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: true,
+    chunkedLoading: true,
+    iconCreateFunction(cluster) {
+      const cnt = cluster.getChildCount();
+      const size = cnt < 50 ? 'small' : cnt < 200 ? 'medium' : 'large';
+      return L.divIcon({
+        html: `<div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;background:${cnt<50?'rgba(37,99,235,.85)':cnt<200?'rgba(217,119,6,.85)':'rgba(220,38,38,.85)'};box-shadow:0 2px 8px rgba(0,0,0,.25);">${cnt.toLocaleString()}</div>`,
+        className: 'marker-cluster marker-cluster-'+size,
+        iconSize: [36, 36]
+      });
+    }
+  });
+
+  stores.forEach(s => {
+    const brand = BRANDS.find(b => b.id === s.brandId);
+    if (!brand) return;
+    const marker = L.marker([s.lat, s.lng], { icon: makeIcon(brand.color, brand.icon) });
+    marker.bindPopup(`
+      <div class="store-popup">
+        <div class="p-brand-row">
+          <div class="p-brand-badge" style="background:${brand.color}20">${brand.icon}</div>
+          <span class="p-brand-name" style="color:${brand.color}">${brand.name}</span>
+        </div>
+        <div class="p-name">${s.name}</div>
+        <div class="p-addr">${s.address || ''}</div>
+        ${s.phone ? `<div class="p-phone">📞 ${s.phone}</div>` : ''}
+      </div>`, { maxWidth: 260 });
+    marker._sid = s._id;
+    clusterGroup.addLayer(marker);
+  });
+  map.addLayer(clusterGroup);
+}
+
+// ── 탭 전환 ─────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='brand')||(i===1&&tab==='region')));
+  document.getElementById('brand-panel').style.display = tab === 'brand' ? '' : 'none';
+  document.getElementById('region-panel').style.display = tab === 'region' ? '' : 'none';
+}
+
+// ── 브랜드 렌더 ─────────────────────────────────
+function renderBrands() {
+  const counts = {};
+  allStores.forEach(s => { counts[s.brandId] = (counts[s.brandId]||0) + 1; });
   const grid = document.getElementById('brand-grid');
   grid.innerHTML = '';
+
   const allBtn = document.createElement('button');
-  allBtn.className = 'brand-btn' + (activeId === null ? ' active' : '');
-  allBtn.style.cssText = activeId === null
-    ? 'background:var(--primary);border-color:var(--primary);grid-column:span 2'
-    : 'grid-column:span 2';
-  allBtn.innerHTML = `<span class="icon">🗺️</span><span>전체</span><span class="cnt">${allStores.length.toLocaleString()}</span>`;
-  allBtn.onclick = () => selectBrand(null);
+  allBtn.className = 'brand-btn all-btn' + (activeId===null?' active':'');
+  allBtn.style.cssText = activeId===null ? 'background:var(--primary);border-color:var(--primary);color:#fff' : '';
+  allBtn.innerHTML = `<span class="b-icon">🗺️</span><span class="b-name" style="font-size:12px">전체 브랜드</span><span class="b-cnt" style="margin-left:auto">${allStores.length.toLocaleString()}</span>`;
+  allBtn.onclick = () => { activeId = null; applyAll(); };
   grid.appendChild(allBtn);
+
   BRANDS.forEach(b => {
     const btn = document.createElement('button');
-    btn.className = 'brand-btn' + (activeId === b.id ? ' active' : '');
-    if (activeId === b.id) btn.style.background = b.color;
-    btn.innerHTML = `<span class="icon">${b.icon}</span><span>${b.name}</span><span class="cnt">${(counts[b.id]||0).toLocaleString()}</span>`;
-    btn.onclick = () => selectBrand(b.id);
+    btn.className = 'brand-btn' + (activeId===b.id?' active':'');
+    if (activeId===b.id) btn.style.background = b.color;
+    btn.innerHTML = `<span class="b-icon">${b.icon}</span><span class="b-name">${b.name}</span><span class="b-cnt">${(counts[b.id]||0).toLocaleString()}</span>`;
+    btn.onclick = () => { activeId = (activeId===b.id ? null : b.id); applyAll(); };
     grid.appendChild(btn);
   });
 }
 
-function selectBrand(id) {
-  activeId = id;
-  document.getElementById('active-brand-label').textContent = id ? (BRANDS.find(b=>b.id===id)?.name||'') : '전체';
-  Object.keys(layers).forEach(bid => {
-    id === null || id === bid ? map.addLayer(layers[bid]) : map.removeLayer(layers[bid]);
+// ── 지역 렌더 ───────────────────────────────────
+function renderRegions() {
+  const counts = {};
+  allStores.forEach(s => {
+    const rid = getRegionId(s.address);
+    if (rid) counts[rid] = (counts[rid]||0) + 1;
   });
-  applySearch();
-  renderBrands(countByBrand());
+  const grid = document.getElementById('region-grid');
+  grid.innerHTML = '';
+
+  const allBtn = document.createElement('button');
+  allBtn.className = 'region-btn all-region-btn' + (activeRegion===null?' active':'');
+  allBtn.innerHTML = `<span>📍</span><span style="font-size:13px">전체 지역</span><span class="r-cnt" style="margin-left:auto">${allStores.length.toLocaleString()}</span>`;
+  allBtn.onclick = () => { activeRegion = null; applyAll(); };
+  grid.appendChild(allBtn);
+
+  REGIONS.forEach(r => {
+    const btn = document.createElement('button');
+    btn.className = 'region-btn' + (activeRegion===r.id?' active':'');
+    btn.innerHTML = `<span>${r.label}</span><span class="r-cnt">${(counts[r.id]||0).toLocaleString()}</span>`;
+    btn.onclick = () => { activeRegion = (activeRegion===r.id ? null : r.id); applyAll(); };
+    grid.appendChild(btn);
+  });
 }
 
-function applySearch() {
+// ── 필터 칩 ─────────────────────────────────────
+function updateChips() {
+  const container = document.getElementById('filter-chips');
+  container.innerHTML = '';
+  let visible = false;
+
+  if (activeId) {
+    const b = BRANDS.find(x => x.id===activeId);
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.style.cssText = `background:${b.color}18;color:${b.color};border:1.5px solid ${b.color}40`;
+    chip.innerHTML = `${b.icon} ${b.name} <span class="chip-x">✕</span>`;
+    chip.onclick = () => { activeId = null; applyAll(); };
+    container.appendChild(chip);
+    visible = true;
+  }
+  if (activeRegion) {
+    const r = REGIONS.find(x => x.id===activeRegion);
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.style.cssText = 'background:#0f172a15;color:#0f172a;border:1.5px solid #0f172a30';
+    chip.innerHTML = `📍 ${r.label} <span class="chip-x">✕</span>`;
+    chip.onclick = () => { activeRegion = null; applyAll(); };
+    container.appendChild(chip);
+    visible = true;
+  }
+  container.classList.toggle('visible', visible);
+}
+
+// ── 검색 초기화 ─────────────────────────────────
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').classList.remove('visible');
+  applyAll();
+}
+
+// ── 통합 필터 ───────────────────────────────────
+function applyAll() {
   const q = document.getElementById('search-input').value.trim().toLowerCase();
-  const base = activeId ? allStores.filter(s => s.brandId === activeId) : allStores;
-  filtered = q ? base.filter(s => s.name.toLowerCase().includes(q) || (s.address||'').toLowerCase().includes(q)) : base;
+
+  filtered = allStores.filter(s => {
+    if (activeId && s.brandId !== activeId) return false;
+    if (activeRegion && getRegionId(s.address) !== activeRegion) return false;
+    if (q && !s.name.toLowerCase().includes(q) && !(s.address||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  // 지도 마커 업데이트
+  buildMarkers(filtered);
+
+  // 필터 레이블
+  const parts = [];
+  if (activeId) parts.push(BRANDS.find(b=>b.id===activeId)?.name);
+  if (activeRegion) parts.push(REGIONS.find(r=>r.id===activeRegion)?.label);
+  document.getElementById('active-filter-label').textContent = parts.length ? parts.join(' · ') : '전체';
+
+  updateChips();
+  renderBrands();
+  renderRegions();
   renderList();
 }
 
+// ── 목록 렌더 ────────────────────────────────────
 function renderList() {
   const el = document.getElementById('store-list');
   document.getElementById('list-count').textContent = filtered.length.toLocaleString();
-  if (!filtered.length) { el.innerHTML = `<div class="empty-msg"><span class="big">🔍</span><span>검색 결과가 없습니다</span></div>`; return; }
+  el.scrollTop = 0;
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-msg"><span class="big">🔍</span><span>검색 결과가 없습니다</span></div>`;
+    return;
+  }
+
   const frag = document.createDocumentFragment();
-  filtered.slice(0, 300).forEach(s => {
+  const show = filtered.slice(0, 300);
+  show.forEach(s => {
+    const b = BRANDS.find(x => x.id===s.brandId);
     const div = document.createElement('div');
     div.className = 'store-item';
     div.innerHTML = `
-      <span class="store-dot" style="background:${s.brandColor}"></span>
+      <div class="store-badge" style="background:${b.color}18">${b.icon}</div>
       <div class="store-info">
-        <div class="store-name">${s.brandName} ${s.name}</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">
+          <span class="store-name">${s.name}</span>
+        </div>
+        <div style="margin-bottom:2px"><span class="store-brand-tag" style="background:${b.color}15;color:${b.color}">${b.name}</span></div>
         <div class="store-addr">${s.address || '주소 미제공'}</div>
         ${s.phone ? `<div class="store-phone">📞 ${s.phone}</div>` : ''}
       </div>`;
     div.onclick = () => focusStore(s, div);
     frag.appendChild(div);
   });
+
   if (filtered.length > 300) {
     const more = document.createElement('div');
-    more.className = 'empty-msg'; more.style.height = '60px';
-    more.innerHTML = `<span style="font-size:12px">+ ${(filtered.length-300).toLocaleString()}개 더 있습니다. 검색으로 좁혀주세요.</span>`;
+    more.className = 'empty-msg'; more.style.height = '64px';
+    more.innerHTML = `<span style="font-size:12px;color:var(--muted)">+ ${(filtered.length-300).toLocaleString()}개 더 있습니다<br>검색어로 좁혀주세요</span>`;
     frag.appendChild(more);
   }
-  el.innerHTML = ''; el.appendChild(frag);
+  el.innerHTML = '';
+  el.appendChild(frag);
 }
 
+// ── 가맹점 포커스 ────────────────────────────────
 function focusStore(s, el) {
   if (activeItem) activeItem.classList.remove('active');
   el.classList.add('active'); activeItem = el;
   map.setView([s.lat, s.lng], 16, { animate: true });
-  const group = layers[s.brandId];
-  if (group) group.eachLayer(m => { if (m._sid === s._id) m.openPopup(); });
 }
 
-function countByBrand() {
-  const c = {};
-  allStores.forEach(s => { c[s.brandId] = (c[s.brandId]||0) + 1; });
-  return c;
+// ── 내 위치 ─────────────────────────────────────
+function goToMyLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    map.setView([pos.coords.latitude, pos.coords.longitude], 14, { animate: true });
+  });
 }
 
+// ── 데이터 로드 ──────────────────────────────────
 async function loadData() {
   let idx = 0;
   const results = await Promise.allSettled(
@@ -276,15 +592,22 @@ async function loadData() {
       allStores.push({ ...s, _id: idx++, brandId: brand.id, brandName: brand.name, brandColor: brand.color });
     });
   });
+
   document.getElementById('total-count').textContent = allStores.length.toLocaleString();
-  buildMarkers(allStores);
   filtered = [...allStores];
-  renderBrands(countByBrand());
+  buildMarkers(allStores);
+  renderBrands();
+  renderRegions();
   renderList();
   document.getElementById('loading').classList.add('hidden');
 }
 
-document.getElementById('search-input').addEventListener('input', applySearch);
+// ── 이벤트 ───────────────────────────────────────
+document.getElementById('search-input').addEventListener('input', function() {
+  document.getElementById('search-clear').classList.toggle('visible', this.value.length > 0);
+  applyAll();
+});
+
 loadData();
 </script>
 </body>
