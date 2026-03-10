@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>프차프차 — 전국 프랜차이즈 가맹점 지도</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=53dy6np4o0"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -71,7 +71,7 @@
       padding: 1px 4px; border-radius: 4px; min-width: 20px; text-align: center;
     }
 
-    /* 검색 + 필터 */
+    /* 검색 */
     #search-panel { padding: 12px 14px; border-bottom: 1px solid var(--border); }
     #search-wrap { position: relative; }
     #search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
@@ -98,9 +98,7 @@
     }
     .store-item:hover { background: #f8faff; }
     .store-item.active { background: #eff6ff; }
-    .store-dot {
-      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
-    }
+    .store-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
     .store-info { flex: 1; min-width: 0; }
     .store-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
     .store-addr { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -115,15 +113,14 @@
     /* ── Map ── */
     #map { flex: 1; }
 
-    /* ── Popup ── */
-    .leaflet-popup-content-wrapper { border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,.15); }
-    .store-popup { min-width: 200px; }
-    .store-popup .p-brand { font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; margin-bottom: 5px; }
-    .store-popup .p-name  { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    /* ── 네이버 InfoWindow 커스텀 ── */
+    .store-popup { min-width: 200px; padding: 4px 2px; font-family: 'Noto Sans KR', sans-serif; }
+    .store-popup .p-brand { font-size: 11px; font-weight: 700; letter-spacing: .3px; margin-bottom: 5px; }
+    .store-popup .p-name  { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: #111; }
     .store-popup .p-addr  { font-size: 12px; color: #555; line-height: 1.5; margin-bottom: 4px; }
     .store-popup .p-phone { font-size: 12px; color: #888; }
 
-    /* Loading overlay */
+    /* Loading */
     #loading {
       position: fixed; inset: 0; background: rgba(255,255,255,.9);
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -138,7 +135,6 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     #loading p { font-size: 15px; color: var(--muted); }
 
-    /* Scrollbar */
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 
@@ -160,17 +156,15 @@
 <header id="header">
   <div class="logo">프차프차</div>
   <div class="sub">전국 프랜차이즈 가맹점 지도</div>
-  <div class="stats" id="total-stat">총 <b id="total-count">0</b>개 가맹점</div>
+  <div class="stats">총 <b id="total-count">0</b>개 가맹점</div>
 </header>
 
 <div id="layout">
-  <!-- 사이드바 -->
   <aside id="sidebar">
     <div id="brand-panel">
       <h3>브랜드 선택</h3>
       <div id="brand-grid"></div>
     </div>
-
     <div id="search-panel">
       <div id="search-wrap">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -179,22 +173,17 @@
         <input id="search-input" type="text" placeholder="가맹점명 또는 주소 검색...">
       </div>
     </div>
-
     <div id="list-header">
       <span><b id="list-count">0</b>개 가맹점</span>
       <span id="active-brand-label" style="font-size:12px; color:var(--muted);">전체</span>
     </div>
-
     <div id="store-list"></div>
   </aside>
 
-  <!-- 지도 -->
   <div id="map"></div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ── 브랜드 메타 ──────────────────────────────
 const BRANDS = [
   { id:"kyochon",    name:"교촌치킨",    color:"#c8102e", icon:"🍗" },
   { id:"bbq",        name:"BBQ",         color:"#ffb300", icon:"🍗" },
@@ -218,32 +207,87 @@ const BRANDS = [
   { id:"bbonjok",    name:"뽕족",        color:"#ff4500", icon:"🍜" },
 ];
 
-// ── 상태 ────────────────────────────────────
-let allStores  = [];   // { ...storeFields, brandId, brandName, brandColor }
+let allStores  = [];
 let filtered   = [];
-let markers    = {};   // brandId → L.LayerGroup
-let activeId   = null; // null = 전체
+let markerObjs = {};   // brandId → { marker, infoWindow }[]
+let activeId   = null;
 let activeItem = null;
+let openInfoWindow = null;
 
-// ── 지도 초기화 ──────────────────────────────
-const map = L.map('map', { zoomControl: true }).setView([36.5, 127.8], 7);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors',
-  maxZoom: 19,
-}).addTo(map);
+// ── 네이버 지도 초기화 ──────────────────────
+const map = new naver.maps.Map('map', {
+  center: new naver.maps.LatLng(36.5, 127.8),
+  zoom: 7,
+  mapTypeId: naver.maps.MapTypeId.NORMAL,
+});
 
-// ── 마커 아이콘 ──────────────────────────────
-function makeIcon(color) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">
-    <path d="M12 0C5.373 0 0 5.373 0 12c0 8 12 20 12 20s12-12 12-20C24 5.373 18.627 0 12 0z"
-      fill="${color}" stroke="#fff" stroke-width="1.5"/>
-    <circle cx="12" cy="12" r="5" fill="#fff" opacity=".85"/>
-  </svg>`;
-  return L.divIcon({
-    html: svg,
-    iconSize: [24, 32], iconAnchor: [12, 32], popupAnchor: [0, -32],
-    className: '',
+// ── 커스텀 마커 HTML ─────────────────────────
+function markerHtml(color) {
+  return `<div style="
+    width:20px;height:27px;position:relative;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
+  ">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="27" viewBox="0 0 20 27">
+      <path d="M10 0C4.477 0 0 4.477 0 10c0 6.627 10 17 10 17s10-10.373 10-17C20 4.477 15.523 0 10 0z"
+        fill="${color}"/>
+      <circle cx="10" cy="10" r="4" fill="#fff" opacity=".9"/>
+    </svg>
+  </div>`;
+}
+
+// ── 마커 생성 ────────────────────────────────
+function buildMarkers(stores) {
+  // 기존 마커 제거
+  Object.values(markerObjs).forEach(arr =>
+    arr.forEach(({ marker }) => marker.setMap(null))
+  );
+  markerObjs = {};
+
+  BRANDS.forEach(b => {
+    markerObjs[b.id] = [];
+    stores.filter(s => s.brandId === b.id).forEach(s => {
+      const marker = new naver.maps.Marker({
+        position: new naver.maps.LatLng(s.lat, s.lng),
+        map: map,
+        icon: {
+          content: markerHtml(b.color),
+          anchor: new naver.maps.Point(10, 27),
+        },
+      });
+
+      const infoWindow = new naver.maps.InfoWindow({
+        content: `<div class="store-popup">
+          <div class="p-brand" style="color:${b.color}">${b.icon} ${b.name}</div>
+          <div class="p-name">${s.name}</div>
+          <div class="p-addr">${s.address || ''}</div>
+          ${s.phone ? `<div class="p-phone">📞 ${s.phone}</div>` : ''}
+        </div>`,
+        borderWidth: 0,
+        borderRadius: '10px',
+        boxShadow: '0 4px 16px rgba(0,0,0,.15)',
+        backgroundColor: '#fff',
+        disableAnchor: false,
+        pixelOffset: new naver.maps.Point(0, -5),
+      });
+
+      naver.maps.Event.addListener(marker, 'click', () => {
+        if (openInfoWindow) openInfoWindow.close();
+        if (openInfoWindow === infoWindow) { openInfoWindow = null; return; }
+        infoWindow.open(map, marker);
+        openInfoWindow = infoWindow;
+      });
+
+      marker._storeId = s._id;
+      markerObjs[b.id].push({ marker, infoWindow, store: s });
+    });
   });
+}
+
+// ── 브랜드 show/hide ─────────────────────────
+function setMarkersVisible(brandId, visible) {
+  (markerObjs[brandId] || []).forEach(({ marker }) =>
+    marker.setMap(visible ? map : null)
+  );
 }
 
 // ── 브랜드 버튼 렌더 ────────────────────────
@@ -251,7 +295,6 @@ function renderBrands(counts) {
   const grid = document.getElementById('brand-grid');
   grid.innerHTML = '';
 
-  // '전체' 버튼
   const allBtn = document.createElement('button');
   allBtn.className = 'brand-btn' + (activeId === null ? ' active' : '');
   allBtn.style.cssText = activeId === null
@@ -266,7 +309,6 @@ function renderBrands(counts) {
     const btn = document.createElement('button');
     btn.className = 'brand-btn' + (activeId === b.id ? ' active' : '');
     if (activeId === b.id) btn.style.background = b.color;
-    btn.dataset.brand = b.id;
     btn.innerHTML = `<span class="icon">${b.icon}</span><span>${b.name}</span><span class="cnt">${cnt.toLocaleString()}</span>`;
     btn.onclick = () => selectBrand(b.id);
     grid.appendChild(btn);
@@ -276,16 +318,11 @@ function renderBrands(counts) {
 // ── 브랜드 선택 ─────────────────────────────
 function selectBrand(id) {
   activeId = id;
+  if (openInfoWindow) { openInfoWindow.close(); openInfoWindow = null; }
   document.getElementById('active-brand-label').textContent =
     id ? (BRANDS.find(b => b.id === id)?.name || '') : '전체';
 
-  // 마커 레이어 show/hide
-  Object.keys(markers).forEach(bid => {
-    const layer = markers[bid];
-    if (id === null || id === bid) map.addLayer(layer);
-    else map.removeLayer(layer);
-  });
-
+  BRANDS.forEach(b => setMarkersVisible(b.id, id === null || id === b.id));
   applySearch();
   renderBrands(countByBrand());
 }
@@ -311,7 +348,7 @@ function renderList() {
   }
 
   const frag = document.createDocumentFragment();
-  filtered.slice(0, 300).forEach((s, i) => {
+  filtered.slice(0, 300).forEach(s => {
     const div = document.createElement('div');
     div.className = 'store-item';
     div.innerHTML = `
@@ -343,41 +380,16 @@ function focusStore(s, el) {
   el.classList.add('active');
   activeItem = el;
 
-  map.setView([s.lat, s.lng], 16, { animate: true });
+  map.setCenter(new naver.maps.LatLng(s.lat, s.lng));
+  map.setZoom(16);
 
-  // 해당 마커의 팝업 열기
-  const layer = markers[s.brandId];
-  if (layer) {
-    layer.eachLayer(m => {
-      if (m._storeId === s._id) m.openPopup();
-    });
+  if (openInfoWindow) { openInfoWindow.close(); openInfoWindow = null; }
+  const arr = markerObjs[s.brandId] || [];
+  const found = arr.find(o => o.marker._storeId === s._id);
+  if (found) {
+    found.infoWindow.open(map, found.marker);
+    openInfoWindow = found.infoWindow;
   }
-}
-
-// ── 마커 생성 ────────────────────────────────
-function buildMarkers(stores) {
-  // 기존 레이어 제거
-  Object.values(markers).forEach(l => map.removeLayer(l));
-  markers = {};
-
-  BRANDS.forEach(b => {
-    const group = L.layerGroup();
-    const icon  = makeIcon(b.color);
-    stores.filter(s => s.brandId === b.id).forEach(s => {
-      const m = L.marker([s.lat, s.lng], { icon })
-        .bindPopup(`
-          <div class="store-popup">
-            <div class="p-brand" style="color:${b.color}">${b.icon} ${b.name}</div>
-            <div class="p-name">${s.name}</div>
-            <div class="p-addr">${s.address || ''}</div>
-            ${s.phone ? `<div class="p-phone">📞 ${s.phone}</div>` : ''}
-          </div>`);
-      m._storeId = s._id;
-      group.addLayer(m);
-    });
-    markers[b.id] = group;
-    group.addTo(map);
-  });
 }
 
 // ── 브랜드별 카운트 ──────────────────────────
@@ -390,8 +402,6 @@ function countByBrand() {
 // ── 데이터 로드 ──────────────────────────────
 async function loadData() {
   let idx = 0;
-
-  // data/ 폴더에서 각 브랜드 JSON 로드
   const results = await Promise.allSettled(
     BRANDS.map(b => fetch(`data/${b.id}.json`)
       .then(r => r.ok ? r.json() : [])
@@ -404,30 +414,19 @@ async function loadData() {
     const { brand, list } = r.value;
     list.forEach(s => {
       if (!s.lat || !s.lng) return;
-      allStores.push({
-        ...s,
-        _id: idx++,
-        brandId:    brand.id,
-        brandName:  brand.name,
-        brandColor: brand.color,
-      });
+      allStores.push({ ...s, _id: idx++, brandId: brand.id, brandName: brand.name, brandColor: brand.color });
     });
   });
 
   document.getElementById('total-count').textContent = allStores.length.toLocaleString();
-
   buildMarkers(allStores);
   filtered = [...allStores];
   renderBrands(countByBrand());
   renderList();
-
   document.getElementById('loading').classList.add('hidden');
 }
 
-// ── 이벤트 ───────────────────────────────────
 document.getElementById('search-input').addEventListener('input', applySearch);
-
-// ── 시작 ────────────────────────────────────
 loadData();
 </script>
 </body>
