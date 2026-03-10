@@ -186,6 +186,8 @@
 
 <script>
 const BRANDS = [
+  { id:"yoogane",    name:"유가네닭갈비",color:"#e8500a", icon:"🥘" },
+  { id:"hansot",     name:"한솥도시락",  color:"#e85b00", icon:"🍱" },
   { id:"kyochon",    name:"교촌치킨",    color:"#c8102e", icon:"🍗" },
   { id:"bbq",        name:"BBQ",         color:"#ffb300", icon:"🍗" },
   { id:"bhc",        name:"BHC치킨",     color:"#e8001b", icon:"🍗" },
@@ -206,8 +208,6 @@ const BRANDS = [
   { id:"dunkin",     name:"던킨",        color:"#ff6e00", icon:"🍩" },
   { id:"oliveyoung", name:"올리브영",    color:"#00a650", icon:"💄" },
   { id:"bbonjok",    name:"뽕족",        color:"#ff4500", icon:"🍜" },
-  { id:"hansot",     name:"한솥도시락",  color:"#e85b00", icon:"🍱" },
-  { id:"yoogane",    name:"유가네닭갈비",color:"#e8500a", icon:"🥘" },
 ];
 
 let allStores  = [];
@@ -339,14 +339,13 @@ function selectBrand(id) {
 
   BRANDS.forEach(b => setMarkersVisible(b.id, id === null || id === b.id));
 
-  // 명시적으로 filtered 직접 설정 후 렌더
+  // 필터링 후 명시적으로 data 전달
   const q = document.getElementById('search-input').value.trim().toLowerCase();
   const base = id ? allStores.filter(s => s.brandId === id) : allStores;
   filtered = q ? base.filter(s =>
     s.name.toLowerCase().includes(q) || (s.address || '').toLowerCase().includes(q)
   ) : base;
-  document.getElementById('list-count').textContent = filtered.length.toLocaleString();
-  renderList();
+  renderList(filtered);
 
   renderBrands(countByBrand());
 }
@@ -356,23 +355,25 @@ function applySearch() {
   const q = document.getElementById('search-input').value.trim().toLowerCase();
   const base = activeId ? allStores.filter(s => s.brandId === activeId) : allStores;
   filtered = q ? base.filter(s =>
-    s.name.toLowerCase().includes(q) || s.address.toLowerCase().includes(q)
+    s.name.toLowerCase().includes(q) || (s.address || '').toLowerCase().includes(q)
   ) : base;
-  renderList();
+  renderList(filtered);
 }
 
 // ── 목록 렌더 ────────────────────────────────
-function renderList() {
+function renderList(data) {
+  if (!data) data = filtered;
   const el = document.getElementById('store-list');
-  document.getElementById('list-count').textContent = filtered.length.toLocaleString();
+  document.getElementById('list-count').textContent = data.length.toLocaleString();
 
-  if (!filtered.length) {
+  if (!data.length) {
     el.innerHTML = `<div class="empty-msg"><span class="big">🔍</span><span>검색 결과가 없습니다</span></div>`;
+    el.scrollTop = 0;
     return;
   }
 
   const frag = document.createDocumentFragment();
-  filtered.slice(0, 300).forEach(s => {
+  data.slice(0, 300).forEach(s => {
     const div = document.createElement('div');
     div.className = 'store-item';
     div.innerHTML = `
@@ -386,11 +387,11 @@ function renderList() {
     frag.appendChild(div);
   });
 
-  if (filtered.length > 300) {
+  if (data.length > 300) {
     const more = document.createElement('div');
     more.className = 'empty-msg';
     more.style.height = '60px';
-    more.innerHTML = `<span style="font-size:12px">+ ${(filtered.length - 300).toLocaleString()}개 더 있습니다. 검색으로 좁혀주세요.</span>`;
+    more.innerHTML = `<span style="font-size:12px">+ ${(data.length - 300).toLocaleString()}개 더 있습니다. 검색으로 좁혀주세요.</span>`;
     frag.appendChild(more);
   }
 
