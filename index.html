@@ -337,17 +337,21 @@ function selectBrand(id) {
     bh.style.display = 'none';
   }
 
-  BRANDS.forEach(b => setMarkersVisible(b.id, id === null || id === b.id));
-
-  // 필터링 후 명시적으로 data 전달
+  // 리스트 필터링 먼저 수행
   const q = document.getElementById('search-input').value.trim().toLowerCase();
   const base = id ? allStores.filter(s => s.brandId === id) : allStores;
   filtered = q ? base.filter(s =>
     s.name.toLowerCase().includes(q) || (s.address || '').toLowerCase().includes(q)
   ) : base;
   renderList(filtered);
-
   renderBrands(countByBrand());
+
+  // 마커 표시/숨김
+  try {
+    BRANDS.forEach(b => setMarkersVisible(b.id, id === null || id === b.id));
+  } catch(e) {
+    console.warn('마커 업데이트 실패:', e);
+  }
 }
 
 // ── 검색 필터 ───────────────────────────────
