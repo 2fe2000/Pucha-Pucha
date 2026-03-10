@@ -325,7 +325,22 @@
       .brand-btn.active { box-shadow: 0 2px 8px rgba(0,0,0,.2) !important; }
       .all-btn { grid-column: auto; padding: 4px 9px; justify-content: center; }
 
-      /* Region panel: hidden in peek (overflow:hidden clips it), shown in half/full */
+      /* Region panel: compact horizontal scroll on mobile */
+      #region-panel { padding: 0 10px 4px; border-bottom: none; }
+      #region-grid {
+        display: flex !important; flex-direction: row;
+        overflow-x: auto; overflow-y: hidden;
+        max-height: none; padding: 0; gap: 6px;
+        scrollbar-width: none; -webkit-overflow-scrolling: touch;
+      }
+      #region-grid::-webkit-scrollbar { display: none; }
+      .region-btn {
+        flex-direction: row; flex-shrink: 0;
+        padding: 4px 9px; border-radius: 16px;
+        height: 28px; gap: 4px; font-size: 11px;
+      }
+      .region-btn .r-cnt { font-size: 9px; }
+      .all-region-btn { grid-column: auto; padding: 4px 9px; font-size: 11px; gap: 4px; }
       #sidebar.half #region-panel,
       #sidebar.full #region-panel { /* visibility controlled by switchTab JS */ }
 
