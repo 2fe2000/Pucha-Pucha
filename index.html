@@ -237,6 +237,21 @@
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
 
+    /* Hide native iOS search cancel button (we have our own ✕) */
+    #search-input::-webkit-search-cancel-button { display: none; }
+
+    /* ── 0-data brands ── */
+    .brand-btn.no-data { opacity: 0.38; pointer-events: none; }
+
+    /* ── Active store left accent ── */
+    .store-item.active { background: var(--primary-light); border-left: 3px solid var(--primary); }
+
+    /* ── Loading progress bar ── */
+    #load-bar-wrap {
+      width: 200px; height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden;
+    }
+    #load-bar { height: 100%; background: var(--primary); border-radius: 2px; width: 0%; transition: width .15s; }
+
     /* ══════════════════════════════════════════
        MOBILE  ≤ 767px  — Bottom Sheet Layout
     ══════════════════════════════════════════ */
@@ -278,7 +293,17 @@
       #sidebar.full #tab-bar { display: flex; }
 
       /* Brand panel: always visible in peek as horizontal chip strip */
-      #brand-panel { padding: 0 10px 4px; border-bottom: none; }
+      #brand-panel { padding: 0 10px 4px; border-bottom: none; position: relative; }
+
+      /* Hide 0-data chips on mobile entirely */
+      .brand-btn.no-data { display: none !important; }
+
+      /* Fade-out right edge of chip strip */
+      #brand-panel::after {
+        content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 32px;
+        background: linear-gradient(to right, transparent, #fff);
+        pointer-events: none; z-index: 1;
+      }
       #brand-grid {
         display: flex !important; flex-direction: row;
         overflow-x: auto; overflow-y: hidden;
@@ -358,7 +383,11 @@
 </head>
 <body>
 
-<div id="loading"><div class="spinner"></div><p>가맹점 데이터 불러오는 중... <b id="load-progress"></b></p></div>
+<div id="loading">
+  <div class="spinner"></div>
+  <p>가맹점 데이터 불러오는 중... <b id="load-progress">0 / 23</b></p>
+  <div id="load-bar-wrap"><div id="load-bar"></div></div>
+</div>
 
 <header id="header">
   <div class="logo-wrap">
@@ -509,6 +538,13 @@ function makeIcon(color, emoji) {
   });
 }
 
+// ── Popup 옵션 ───────────────────────────────────
+function popupOpts() {
+  const opts = { maxWidth: 260 };
+  if (isMobile()) opts.autoPanPaddingBottomRight = L.point(10, 110);
+  return opts;
+}
+
 // ── 마커 클러스터 빌드 ──────────────────────────
 function buildMarkers(stores) {
   if (clusterGroup) map.removeLayer(clusterGroup);
@@ -540,8 +576,8 @@ function buildMarkers(stores) {
         </div>
         <div class="p-name">${s.name}</div>
         <div class="p-addr">${s.address || ''}</div>
-        ${s.phone ? `<div class="p-phone">📞 ${s.phone}</div>` : ''}
-      </div>`, { maxWidth: 260 });
+        ${s.phone ? `<div class="p-phone"><a href="tel:${s.phone.replace(/[^0-9+]/g,'')}" style="color:inherit;text-decoration:none">📞 ${s.phone}</a></div>` : ''}
+      </div>`, popupOpts());
     marker._sid = s._id;
     clusterGroup.addLayer(marker);
   });
@@ -572,10 +608,14 @@ function renderBrands() {
   grid.appendChild(allBtn);
 
   BRANDS.forEach(b => {
+    const cnt = counts[b.id] || 0;
     const btn = document.createElement('button');
-    btn.className = 'brand-btn' + (activeId===b.id?' active':'');
+    let cls = 'brand-btn';
+    if (activeId===b.id) cls += ' active';
+    if (cnt === 0) cls += ' no-data';
+    btn.className = cls;
     if (activeId===b.id) btn.style.background = b.color;
-    btn.innerHTML = `<span class="b-icon">${b.icon}</span><span class="b-name">${b.name}</span><span class="b-cnt">${(counts[b.id]||0).toLocaleString()}</span>`;
+    btn.innerHTML = `<span class="b-icon">${b.icon}</span><span class="b-name">${b.name}</span><span class="b-cnt">${cnt.toLocaleString()}</span>`;
     btn.onclick = () => {
       activeId = (activeId===b.id ? null : b.id);
       applyAll();
@@ -583,6 +623,14 @@ function renderBrands() {
     };
     grid.appendChild(btn);
   });
+
+  // Scroll active chip into view on mobile
+  if (isMobile() && activeId) {
+    requestAnimationFrame(() => {
+      const active = grid.querySelector('.brand-btn.active');
+      if (active) active.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    });
+  }
 }
 
 // ── 지역 렌더 ───────────────────────────────────
@@ -715,25 +763,25 @@ function renderList() {
 }
 
 // ── 가맹점 포커스 ────────────────────────────────
+function openPopupForStore(sid) {
+  if (!clusterGroup) return;
+  const layer = [...clusterGroup.getLayers()].find(m => m._sid === sid);
+  if (!layer) return;
+  clusterGroup.zoomToShowLayer(layer, () => {
+    layer.openPopup();
+  });
+}
+
 function focusStore(s, el) {
   if (activeItem) activeItem.classList.remove('active');
   el.classList.add('active'); activeItem = el;
 
   if (isMobile()) {
     setSheetState('peek');
-    setTimeout(() => {
-      map.setView([s.lat, s.lng], 16, { animate: true });
-      setTimeout(() => {
-        if (clusterGroup) {
-          clusterGroup.zoomToShowLayer(
-            [...clusterGroup.getLayers()].find(m => m._sid === s._id),
-            () => {}
-          );
-        }
-      }, 350);
-    }, 50);
+    setTimeout(() => openPopupForStore(s._id), 80);
   } else {
     map.setView([s.lat, s.lng], 16, { animate: true });
+    setTimeout(() => openPopupForStore(s._id), 350);
   }
 }
 
@@ -769,6 +817,19 @@ function setSheetState(state) {
   if (state === 'full') sidebar.classList.add('full');
   // Set on :root so CSS calc() in btn-locate & leaflet controls picks it up
   document.documentElement.style.setProperty('--sheet-h', px + 'px');
+
+  // In peek: always show brand panel (chip strip), hide region panel
+  // In half/full: restore whichever tab was active
+  const brandPanel  = document.getElementById('brand-panel');
+  const regionPanel = document.getElementById('region-panel');
+  if (state === 'peek') {
+    brandPanel.style.display  = '';
+    regionPanel.style.display = 'none';
+  } else {
+    brandPanel.style.display  = currentTab === 'brand'  ? '' : 'none';
+    regionPanel.style.display = currentTab === 'region' ? '' : 'none';
+  }
+
   setTimeout(() => map.invalidateSize(), 340);
 }
 
@@ -799,7 +860,7 @@ document.getElementById('sheet-handle').addEventListener('click', () => {
     document.documentElement.style.setProperty('--sheet-h', newH + 'px');
   }, { passive: true });
 
-  window.addEventListener('touchend', () => {
+  function snapToState() {
     if (!dragging) return;
     dragging = false;
     sidebar.classList.remove('dragging');
@@ -808,8 +869,16 @@ document.getElementById('sheet-handle').addEventListener('click', () => {
     if      (h < vh * 0.26) setSheetState('peek');
     else if (h < vh * 0.72) setSheetState('half');
     else                     setSheetState('full');
-  });
+  }
+
+  window.addEventListener('touchend',    snapToState);
+  window.addEventListener('touchcancel', snapToState);
 })();
+
+// Tap map → collapse sheet to peek
+map.on('click', () => {
+  if (isMobile() && getSheetState() !== 'peek') setSheetState('peek');
+});
 
 // ── 검색 이벤트 ──────────────────────────────────
 document.getElementById('search-input').addEventListener('input', function() {
@@ -834,8 +903,22 @@ window.addEventListener('resize', () => {
 // ── 데이터 로드 ──────────────────────────────────
 async function loadData() {
   let idx = 0;
+  const total = BRANDS.length;
+  let done = 0;
+  const progressEl = document.getElementById('load-progress');
+  const barEl = document.getElementById('load-bar');
+
   const results = await Promise.allSettled(
-    BRANDS.map(b => fetch(`data/${b.id}.json`).then(r => r.ok ? r.json() : []).then(list => ({ brand: b, list })))
+    BRANDS.map(b =>
+      fetch(`data/${b.id}.json`)
+        .then(r => r.ok ? r.json() : [])
+        .then(list => {
+          done++;
+          if (progressEl) progressEl.textContent = `${done} / ${total}`;
+          if (barEl) barEl.style.width = Math.round(done / total * 100) + '%';
+          return { brand: b, list };
+        })
+    )
   );
   results.forEach(r => {
     if (r.status !== 'fulfilled') return;
