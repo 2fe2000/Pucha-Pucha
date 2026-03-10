@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>프차프차 — 전국 프랜차이즈 가맹점 지도</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8f9fa;
+      --sidebar-w: 360px;
+      --header-h: 56px;
+      --primary: #2563eb;
+      --border: #e5e7eb;
+      --text: #111827;
+      --muted: #6b7280;
+      --radius: 10px;
+    }
+
+    body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ── Header ── */
+    #header {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
+      background: #fff; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 20px; gap: 12px;
+      z-index: 1000; box-shadow: 0 1px 6px rgba(0,0,0,.07);
+    }
+    #header .logo { font-size: 20px; font-weight: 700; color: var(--primary); letter-spacing: -0.5px; }
+    #header .sub  { font-size: 13px; color: var(--muted); }
+    #header .stats { margin-left: auto; font-size: 13px; color: var(--muted); }
+    #header .stats b { color: var(--primary); }
+
+    /* ── Layout ── */
+    #layout {
+      display: flex; height: calc(100vh - var(--header-h));
+      margin-top: var(--header-h);
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: var(--sidebar-w); min-width: var(--sidebar-w);
+      background: #fff; border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+      z-index: 100;
+    }
+
+    /* 브랜드 탭 */
+    #brand-panel { padding: 14px 14px 0; border-bottom: 1px solid var(--border); }
+    #brand-panel h3 { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .5px; margin-bottom: 10px; text-transform: uppercase; }
+    #brand-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+      max-height: 220px; overflow-y: auto; padding-bottom: 12px;
+    }
+    .brand-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; padding: 7px 4px; border: 1.5px solid var(--border);
+      border-radius: 8px; background: #fff; cursor: pointer;
+      transition: all .15s; font-size: 10px; color: var(--muted);
+      font-family: inherit;
+    }
+    .brand-btn .icon { font-size: 18px; }
+    .brand-btn:hover { border-color: #94a3b8; color: var(--text); }
+    .brand-btn.active { color: #fff; border-color: transparent; font-weight: 600; }
+    .brand-btn .cnt {
+      font-size: 9px; opacity: .8; background: rgba(255,255,255,.25);
+      padding: 1px 4px; border-radius: 4px; min-width: 20px; text-align: center;
+    }
+
+    /* 검색 + 필터 */
+    #search-panel { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    #search-wrap { position: relative; }
+    #search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+    #search-input {
+      width: 100%; padding: 9px 12px 9px 34px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 13px; font-family: inherit; outline: none;
+      transition: border-color .15s;
+    }
+    #search-input:focus { border-color: var(--primary); }
+
+    /* 가맹점 목록 */
+    #list-header {
+      padding: 10px 14px; display: flex; align-items: center;
+      justify-content: space-between; border-bottom: 1px solid var(--border);
+    }
+    #list-header span { font-size: 13px; color: var(--muted); }
+    #list-header b { color: var(--text); }
+    #store-list { flex: 1; overflow-y: auto; }
+
+    .store-item {
+      padding: 12px 14px; border-bottom: 1px solid #f3f4f6;
+      cursor: pointer; transition: background .12s; display: flex; gap: 10px; align-items: flex-start;
+    }
+    .store-item:hover { background: #f8faff; }
+    .store-item.active { background: #eff6ff; }
+    .store-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+    }
+    .store-info { flex: 1; min-width: 0; }
+    .store-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+    .store-addr { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .store-phone { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+    .empty-msg {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 200px; color: var(--muted); font-size: 14px; gap: 8px;
+    }
+    .empty-msg .big { font-size: 36px; }
+
+    /* ── Map ── */
+    #map { flex: 1; }
+
+    /* ── Popup ── */
+    .leaflet-popup-content-wrapper { border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+    .store-popup { min-width: 200px; }
+    .store-popup .p-brand { font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; margin-bottom: 5px; }
+    .store-popup .p-name  { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .store-popup .p-addr  { font-size: 12px; color: #555; line-height: 1.5; margin-bottom: 4px; }
+    .store-popup .p-phone { font-size: 12px; color: #888; }
+
+    /* Loading overlay */
+    #loading {
+      position: fixed; inset: 0; background: rgba(255,255,255,.9);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 9999; gap: 16px;
+    }
+    #loading.hidden { display: none; }
+    .spinner {
+      width: 44px; height: 44px; border: 4px solid #e5e7eb;
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { font-size: 15px; color: var(--muted); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+
+    @media (max-width: 640px) {
+      :root { --sidebar-w: 100vw; }
+      #layout { flex-direction: column; }
+      #sidebar { width: 100%; height: 50vh; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); }
+      #map { height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>데이터 불러오는 중...</p>
+</div>
+
+<header id="header">
+  <div class="logo">프차프차</div>
+  <div class="sub">전국 프랜차이즈 가맹점 지도</div>
+  <div class="stats" id="total-stat">총 <b id="total-count">0</b>개 가맹점</div>
+</header>
+
+<div id="layout">
+  <!-- 사이드바 -->
+  <aside id="sidebar">
+    <div id="brand-panel">
+      <h3>브랜드 선택</h3>
+      <div id="brand-grid"></div>
+    </div>
+
+    <div id="search-panel">
+      <div id="search-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input id="search-input" type="text" placeholder="가맹점명 또는 주소 검색...">
+      </div>
+    </div>
+
+    <div id="list-header">
+      <span><b id="list-count">0</b>개 가맹점</span>
+      <span id="active-brand-label" style="font-size:12px; color:var(--muted);">전체</span>
+    </div>
+
+    <div id="store-list"></div>
+  </aside>
+
+  <!-- 지도 -->
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── 브랜드 메타 ──────────────────────────────
+const BRANDS = [
+  { id:"kyochon",    name:"교촌치킨",    color:"#c8102e", icon:"🍗" },
+  { id:"bbq",        name:"BBQ",         color:"#ffb300", icon:"🍗" },
+  { id:"bhc",        name:"BHC치킨",     color:"#e8001b", icon:"🍗" },
+  { id:"nene",       name:"네네치킨",    color:"#ff6600", icon:"🍗" },
+  { id:"goobne",     name:"굽네치킨",    color:"#d4380d", icon:"🍗" },
+  { id:"paris",      name:"파리바게뜨",  color:"#003087", icon:"🥐" },
+  { id:"tlj",        name:"뚜레쥬르",    color:"#005bac", icon:"🥐" },
+  { id:"starbucks",  name:"스타벅스",    color:"#00704a", icon:"☕" },
+  { id:"ediya",      name:"이디야",      color:"#0071ce", icon:"☕" },
+  { id:"twosome",    name:"투썸플레이스",color:"#7b2d8b", icon:"☕" },
+  { id:"mcdonalds",  name:"맥도날드",    color:"#ffbc0d", icon:"🍔" },
+  { id:"lotteria",   name:"롯데리아",    color:"#e60012", icon:"🍔" },
+  { id:"burgerking", name:"버거킹",      color:"#d62300", icon:"🍔" },
+  { id:"kfc",        name:"KFC",         color:"#f40027", icon:"🍔" },
+  { id:"pizzahut",   name:"피자헛",      color:"#ee3124", icon:"🍕" },
+  { id:"dominos",    name:"도미노피자",  color:"#006491", icon:"🍕" },
+  { id:"baskin",     name:"배스킨라빈스",color:"#e8256e", icon:"🍦" },
+  { id:"dunkin",     name:"던킨",        color:"#ff6e00", icon:"🍩" },
+  { id:"oliveyoung", name:"올리브영",    color:"#00a650", icon:"💄" },
+  { id:"bbonjok",    name:"뽕족",        color:"#ff4500", icon:"🍜" },
+];
+
+// ── 상태 ────────────────────────────────────
+let allStores  = [];   // { ...storeFields, brandId, brandName, brandColor }
+let filtered   = [];
+let markers    = {};   // brandId → L.LayerGroup
+let activeId   = null; // null = 전체
+let activeItem = null;
+
+// ── 지도 초기화 ──────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([36.5, 127.8], 7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 19,
+}).addTo(map);
+
+// ── 마커 아이콘 ──────────────────────────────
+function makeIcon(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">
+    <path d="M12 0C5.373 0 0 5.373 0 12c0 8 12 20 12 20s12-12 12-20C24 5.373 18.627 0 12 0z"
+      fill="${color}" stroke="#fff" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="5" fill="#fff" opacity=".85"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    iconSize: [24, 32], iconAnchor: [12, 32], popupAnchor: [0, -32],
+    className: '',
+  });
+}
+
+// ── 브랜드 버튼 렌더 ────────────────────────
+function renderBrands(counts) {
+  const grid = document.getElementById('brand-grid');
+  grid.innerHTML = '';
+
+  // '전체' 버튼
+  const allBtn = document.createElement('button');
+  allBtn.className = 'brand-btn' + (activeId === null ? ' active' : '');
+  allBtn.style.cssText = activeId === null
+    ? 'background:var(--primary);border-color:var(--primary);grid-column:span 2'
+    : 'grid-column:span 2';
+  allBtn.innerHTML = `<span class="icon">🗺️</span><span>전체</span><span class="cnt">${allStores.length.toLocaleString()}</span>`;
+  allBtn.onclick = () => selectBrand(null);
+  grid.appendChild(allBtn);
+
+  BRANDS.forEach(b => {
+    const cnt = counts[b.id] || 0;
+    const btn = document.createElement('button');
+    btn.className = 'brand-btn' + (activeId === b.id ? ' active' : '');
+    if (activeId === b.id) btn.style.background = b.color;
+    btn.dataset.brand = b.id;
+    btn.innerHTML = `<span class="icon">${b.icon}</span><span>${b.name}</span><span class="cnt">${cnt.toLocaleString()}</span>`;
+    btn.onclick = () => selectBrand(b.id);
+    grid.appendChild(btn);
+  });
+}
+
+// ── 브랜드 선택 ─────────────────────────────
+function selectBrand(id) {
+  activeId = id;
+  document.getElementById('active-brand-label').textContent =
+    id ? (BRANDS.find(b => b.id === id)?.name || '') : '전체';
+
+  // 마커 레이어 show/hide
+  Object.keys(markers).forEach(bid => {
+    const layer = markers[bid];
+    if (id === null || id === bid) map.addLayer(layer);
+    else map.removeLayer(layer);
+  });
+
+  applySearch();
+  renderBrands(countByBrand());
+}
+
+// ── 검색 필터 ───────────────────────────────
+function applySearch() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const base = activeId ? allStores.filter(s => s.brandId === activeId) : allStores;
+  filtered = q ? base.filter(s =>
+    s.name.toLowerCase().includes(q) || s.address.toLowerCase().includes(q)
+  ) : base;
+  renderList();
+}
+
+// ── 목록 렌더 ────────────────────────────────
+function renderList() {
+  const el = document.getElementById('store-list');
+  document.getElementById('list-count').textContent = filtered.length.toLocaleString();
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-msg"><span class="big">🔍</span><span>검색 결과가 없습니다</span></div>`;
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  filtered.slice(0, 300).forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'store-item';
+    div.innerHTML = `
+      <span class="store-dot" style="background:${s.brandColor}"></span>
+      <div class="store-info">
+        <div class="store-name">${s.brandName} ${s.name}</div>
+        <div class="store-addr">${s.address || '주소 미제공'}</div>
+        ${s.phone ? `<div class="store-phone">📞 ${s.phone}</div>` : ''}
+      </div>`;
+    div.onclick = () => focusStore(s, div);
+    frag.appendChild(div);
+  });
+
+  if (filtered.length > 300) {
+    const more = document.createElement('div');
+    more.className = 'empty-msg';
+    more.style.height = '60px';
+    more.innerHTML = `<span style="font-size:12px">+ ${(filtered.length - 300).toLocaleString()}개 더 있습니다. 검색으로 좁혀주세요.</span>`;
+    frag.appendChild(more);
+  }
+
+  el.innerHTML = '';
+  el.appendChild(frag);
+}
+
+// ── 가맹점 포커스 ────────────────────────────
+function focusStore(s, el) {
+  if (activeItem) activeItem.classList.remove('active');
+  el.classList.add('active');
+  activeItem = el;
+
+  map.setView([s.lat, s.lng], 16, { animate: true });
+
+  // 해당 마커의 팝업 열기
+  const layer = markers[s.brandId];
+  if (layer) {
+    layer.eachLayer(m => {
+      if (m._storeId === s._id) m.openPopup();
+    });
+  }
+}
+
+// ── 마커 생성 ────────────────────────────────
+function buildMarkers(stores) {
+  // 기존 레이어 제거
+  Object.values(markers).forEach(l => map.removeLayer(l));
+  markers = {};
+
+  BRANDS.forEach(b => {
+    const group = L.layerGroup();
+    const icon  = makeIcon(b.color);
+    stores.filter(s => s.brandId === b.id).forEach(s => {
+      const m = L.marker([s.lat, s.lng], { icon })
+        .bindPopup(`
+          <div class="store-popup">
+            <div class="p-brand" style="color:${b.color}">${b.icon} ${b.name}</div>
+            <div class="p-name">${s.name}</div>
+            <div class="p-addr">${s.address || ''}</div>
+            ${s.phone ? `<div class="p-phone">📞 ${s.phone}</div>` : ''}
+          </div>`);
+      m._storeId = s._id;
+      group.addLayer(m);
+    });
+    markers[b.id] = group;
+    group.addTo(map);
+  });
+}
+
+// ── 브랜드별 카운트 ──────────────────────────
+function countByBrand() {
+  const c = {};
+  allStores.forEach(s => { c[s.brandId] = (c[s.brandId] || 0) + 1; });
+  return c;
+}
+
+// ── 데이터 로드 ──────────────────────────────
+async function loadData() {
+  let idx = 0;
+
+  // data/ 폴더에서 각 브랜드 JSON 로드
+  const results = await Promise.allSettled(
+    BRANDS.map(b => fetch(`data/${b.id}.json`)
+      .then(r => r.ok ? r.json() : [])
+      .then(list => ({ brand: b, list }))
+    )
+  );
+
+  results.forEach(r => {
+    if (r.status !== 'fulfilled') return;
+    const { brand, list } = r.value;
+    list.forEach(s => {
+      if (!s.lat || !s.lng) return;
+      allStores.push({
+        ...s,
+        _id: idx++,
+        brandId:    brand.id,
+        brandName:  brand.name,
+        brandColor: brand.color,
+      });
+    });
+  });
+
+  document.getElementById('total-count').textContent = allStores.length.toLocaleString();
+
+  buildMarkers(allStores);
+  filtered = [...allStores];
+  renderBrands(countByBrand());
+  renderList();
+
+  document.getElementById('loading').classList.add('hidden');
+}
+
+// ── 이벤트 ───────────────────────────────────
+document.getElementById('search-input').addEventListener('input', applySearch);
+
+// ── 시작 ────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
