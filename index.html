@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>프차프차 — 전국 프랜차이즈 가맹점 지도</title>
-  <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=py0c9n3kls"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -70,7 +70,7 @@
     .store-popup .p-name  { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: #111; }
     .store-popup .p-addr  { font-size: 12px; color: #555; line-height: 1.5; margin-bottom: 4px; }
     .store-popup .p-phone { font-size: 12px; color: #888; }
-    .iw_inner { padding: 2px; }
+    .leaflet-popup-content-wrapper { border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
     #loading { position: fixed; inset: 0; background: rgba(255,255,255,.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 16px; }
     #loading.hidden { display: none; }
     .spinner { width: 44px; height: 44px; border: 4px solid #e5e7eb; border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
@@ -119,6 +119,7 @@
   <div id="map"></div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const BRANDS = [
   { id:"yoogane",    name:"유가네닭갈비",color:"#e8500a", icon:"🥘" },
@@ -145,50 +146,41 @@ const BRANDS = [
   { id:"bbonjok",    name:"뽕족",        color:"#ff4500", icon:"🍜" },
 ];
 
-let allStores = [], filtered = [], markerObjs = {}, activeId = null, activeItem = null, openIW = null;
+let allStores = [], filtered = [], layers = {}, activeId = null, activeItem = null;
 
-// ── 네이버 지도 ──────────────────────────────
-const map = new naver.maps.Map('map', {
-  center: new naver.maps.LatLng(36.5, 127.8),
-  zoom: 7,
-});
+// ── Leaflet 지도 ──────────────────────────────
+const map = L.map('map').setView([36.5, 127.8], 7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors', maxZoom: 19
+}).addTo(map);
 
-function markerHtml(color) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="27" viewBox="0 0 20 27" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))">
+function makeIcon(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="27" viewBox="0 0 20 27">
     <path d="M10 0C4.477 0 0 4.477 0 10c0 6.627 10 17 10 17s10-10.373 10-17C20 4.477 15.523 0 10 0z" fill="${color}"/>
     <circle cx="10" cy="10" r="4" fill="#fff" opacity=".9"/>
   </svg>`;
+  return L.divIcon({ html: svg, iconSize: [20,27], iconAnchor: [10,27], popupAnchor: [0,-27], className: '' });
 }
 
 function buildMarkers(stores) {
-  Object.values(markerObjs).forEach(arr => arr.forEach(({ m }) => m.setMap(null)));
-  markerObjs = {};
+  Object.values(layers).forEach(g => map.removeLayer(g));
+  layers = {};
   BRANDS.forEach(b => {
-    markerObjs[b.id] = [];
+    const group = L.layerGroup();
+    const icon = makeIcon(b.color);
     stores.filter(s => s.brandId === b.id).forEach(s => {
-      const m = new naver.maps.Marker({
-        position: new naver.maps.LatLng(s.lat, s.lng),
-        map,
-        icon: { content: markerHtml(b.color), anchor: new naver.maps.Point(10, 27) },
-      });
-      const iw = new naver.maps.InfoWindow({
-        content: `<div class="store-popup" style="padding:8px 10px">
+      const m = L.marker([s.lat, s.lng], { icon })
+        .bindPopup(`<div class="store-popup">
           <div class="p-brand" style="color:${b.color}">${b.icon} ${b.name}</div>
           <div class="p-name">${s.name}</div>
           <div class="p-addr">${s.address || ''}</div>
           ${s.phone ? `<div class="p-phone">📞 ${s.phone}</div>` : ''}
-        </div>`,
-        borderWidth: 0, borderRadius: '10px',
-        backgroundColor: '#fff', disableAnchor: false,
-      });
-      naver.maps.Event.addListener(m, 'click', () => {
-        if (openIW) openIW.close();
-        if (openIW === iw) { openIW = null; return; }
-        iw.open(map, m); openIW = iw;
-      });
-      m._sid = s._id;
-      markerObjs[b.id].push({ m, iw });
+        </div>`);
+      m._sid = s._id; m._bid = b.id;
+      group.addLayer(m);
     });
+    layers[b.id] = group;
+    group.addTo(map);
   });
 }
 
@@ -215,11 +207,9 @@ function renderBrands(counts) {
 
 function selectBrand(id) {
   activeId = id;
-  if (openIW) { openIW.close(); openIW = null; }
   document.getElementById('active-brand-label').textContent = id ? (BRANDS.find(b=>b.id===id)?.name||'') : '전체';
-  Object.keys(markerObjs).forEach(bid => {
-    const show = id === null || id === bid;
-    (markerObjs[bid]||[]).forEach(({ m }) => m.setMap(show ? map : null));
+  Object.keys(layers).forEach(bid => {
+    id === null || id === bid ? map.addLayer(layers[bid]) : map.removeLayer(layers[bid]);
   });
   applySearch();
   renderBrands(countByBrand());
@@ -262,11 +252,9 @@ function renderList() {
 function focusStore(s, el) {
   if (activeItem) activeItem.classList.remove('active');
   el.classList.add('active'); activeItem = el;
-  map.setCenter(new naver.maps.LatLng(s.lat, s.lng));
-  map.setZoom(16);
-  if (openIW) { openIW.close(); openIW = null; }
-  const found = (markerObjs[s.brandId]||[]).find(o => o.m._sid === s._id);
-  if (found) { found.iw.open(map, found.m); openIW = found.iw; }
+  map.setView([s.lat, s.lng], 16, { animate: true });
+  const group = layers[s.brandId];
+  if (group) group.eachLayer(m => { if (m._sid === s._id) m.openPopup(); });
 }
 
 function countByBrand() {
