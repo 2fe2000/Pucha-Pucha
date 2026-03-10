@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>프차프차 — 전국 프랜차이즈 가맹점 지도</title>
-  <script src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=53dy6np4o0"></script>
+  <script src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=py0c9n3kls"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -177,6 +177,7 @@
       <span><b id="list-count">0</b>개 가맹점</span>
       <span id="active-brand-label" style="font-size:12px; color:var(--muted);">전체</span>
     </div>
+    <div id="brand-header" style="display:none; padding:10px 14px 8px; border-bottom:1px solid var(--border);"></div>
     <div id="store-list"></div>
   </aside>
 
@@ -206,6 +207,7 @@ const BRANDS = [
   { id:"oliveyoung", name:"올리브영",    color:"#00a650", icon:"💄" },
   { id:"bbonjok",    name:"뽕족",        color:"#ff4500", icon:"🍜" },
   { id:"hansot",     name:"한솥도시락",  color:"#e85b00", icon:"🍱" },
+  { id:"yoogane",    name:"유가네닭갈비",color:"#e8500a", icon:"🥘" },
 ];
 
 let allStores  = [];
@@ -320,11 +322,32 @@ function renderBrands(counts) {
 function selectBrand(id) {
   activeId = id;
   if (openInfoWindow) { openInfoWindow.close(); openInfoWindow = null; }
-  document.getElementById('active-brand-label').textContent =
-    id ? (BRANDS.find(b => b.id === id)?.name || '') : '전체';
+
+  const brand = id ? BRANDS.find(b => b.id === id) : null;
+  document.getElementById('active-brand-label').textContent = brand ? brand.name : '전체';
+
+  // 브랜드 헤더 표시
+  const bh = document.getElementById('brand-header');
+  if (brand) {
+    bh.style.display = 'block';
+    bh.innerHTML = `<span style="font-size:20px">${brand.icon}</span>
+      <span style="font-weight:700; font-size:15px; margin-left:6px; color:${brand.color}">${brand.name}</span>
+      <span style="font-size:12px; color:var(--muted); margin-left:6px;">가맹점만 표시 중</span>`;
+  } else {
+    bh.style.display = 'none';
+  }
 
   BRANDS.forEach(b => setMarkersVisible(b.id, id === null || id === b.id));
-  applySearch();
+
+  // 명시적으로 filtered 직접 설정 후 렌더
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const base = id ? allStores.filter(s => s.brandId === id) : allStores;
+  filtered = q ? base.filter(s =>
+    s.name.toLowerCase().includes(q) || (s.address || '').toLowerCase().includes(q)
+  ) : base;
+  document.getElementById('list-count').textContent = filtered.length.toLocaleString();
+  renderList();
+
   renderBrands(countByBrand());
 }
 
@@ -373,6 +396,7 @@ function renderList() {
 
   el.innerHTML = '';
   el.appendChild(frag);
+  el.scrollTop = 0;
 }
 
 // ── 가맹점 포커스 ────────────────────────────
