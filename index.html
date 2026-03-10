@@ -267,16 +267,18 @@
       }
       #sidebar.dragging { transition: none; }
 
-      /* Show drag handle */
-      #sheet-handle { display: flex; }
+      /* Show drag handle — compact on mobile */
+      #sheet-handle { display: flex; padding: 6px 0 4px; }
+      #sheet-handle::before { width: 32px; height: 3px; }
 
-      /* Tab bar: hidden in peek, visible in half/full */
+      /* Tab bar: hidden in peek, compact in half/full */
       #tab-bar { display: none; }
+      .tab-btn { padding: 7px 8px; font-size: 12px; }
       #sidebar.half #tab-bar,
       #sidebar.full #tab-bar { display: flex; }
 
       /* Brand panel: always visible in peek as horizontal chip strip */
-      #brand-panel { padding: 0 12px 8px; border-bottom: none; }
+      #brand-panel { padding: 0 10px 4px; border-bottom: none; }
       #brand-grid {
         display: flex !important; flex-direction: row;
         overflow-x: auto; overflow-y: hidden;
@@ -285,26 +287,28 @@
       }
       #brand-grid::-webkit-scrollbar { display: none; }
 
-      /* Brand buttons → horizontal pill chips on mobile */
+      /* Brand buttons → compact horizontal pill chips on mobile */
       .brand-btn {
         flex-direction: row; flex-shrink: 0;
-        padding: 6px 11px; border-radius: 20px;
-        height: 34px; gap: 5px; font-size: 12px;
+        padding: 4px 9px; border-radius: 16px;
+        height: 28px; gap: 4px; font-size: 11px;
         transform: none !important; box-shadow: none !important;
       }
-      .brand-btn .b-icon { font-size: 14px; }
-      .brand-btn .b-name { font-size: 12px; white-space: nowrap; overflow: visible; width: auto; padding: 0; }
-      .brand-btn .b-cnt { font-size: 10px; }
+      .brand-btn .b-icon { font-size: 12px; }
+      .brand-btn .b-name { font-size: 11px; white-space: nowrap; overflow: visible; width: auto; padding: 0; }
+      .brand-btn .b-cnt { font-size: 9px; }
       .brand-btn.active { box-shadow: 0 2px 8px rgba(0,0,0,.2) !important; }
-      .all-btn { grid-column: auto; padding: 6px 11px; justify-content: center; }
+      .all-btn { grid-column: auto; padding: 4px 9px; justify-content: center; }
 
       /* Region panel: hidden in peek (overflow:hidden clips it), shown in half/full */
       #sidebar.half #region-panel,
       #sidebar.full #region-panel { /* visibility controlled by switchTab JS */ }
 
-      /* Search, list-header, store-list: hidden in peek */
-      #search-panel { display: none; }
-      #list-header  { display: none; }
+      /* Search, list-header, store-list: hidden in peek, compact when visible */
+      #search-panel { display: none; padding: 6px 10px; }
+      #search-input { padding: 6px 10px 6px 30px; font-size: 12px; border-radius: 6px; }
+      #list-header  { display: none; padding: 5px 10px; }
+      #list-header span { font-size: 11px; }
       #store-list   { display: none; }
 
       #sidebar.half #search-panel,
@@ -314,12 +318,13 @@
       #sidebar.half #store-list,
       #sidebar.full #store-list   { display: block; overflow-y: auto; }
 
-      /* Larger touch targets for store items */
-      .store-item { padding: 13px 14px; min-height: 52px; }
-      .store-name { font-size: 14px; }
-      .store-addr { font-size: 12px; }
-      .store-phone { font-size: 12px; }
-      .store-badge { width: 34px; height: 34px; font-size: 16px; }
+      /* Compact store items — still meets 44px touch target */
+      .store-item { padding: 9px 12px; min-height: 44px; gap: 8px; }
+      .store-name { font-size: 13px; margin-bottom: 1px; }
+      .store-brand-tag { font-size: 9px; padding: 0 4px; margin-bottom: 1px; }
+      .store-addr { font-size: 11px; }
+      .store-phone { font-size: 11px; margin-top: 1px; }
+      .store-badge { width: 30px; height: 30px; font-size: 14px; }
 
       /* Location FAB floats above sheet */
       #my-location-btn {
@@ -758,7 +763,7 @@ function getSheetState() {
 
 function setSheetState(state) {
   const vh = window.innerHeight;
-  const px = { peek: 76, half: Math.round(vh * 0.54), full: vh - 66 }[state];
+  const px = { peek: 76, half: Math.round(vh * 0.60), full: vh - 66 }[state];
   sidebar.classList.remove('half', 'full');
   if (state === 'half') sidebar.classList.add('half');
   if (state === 'full') sidebar.classList.add('full');
